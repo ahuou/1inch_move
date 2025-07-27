@@ -108,7 +108,7 @@ module oneinch_move::oneinch_move {
 
     /// Creates a new hash time lock.
     /// Doesn't `assert` hash length since it should be done by the counterparty anyway.
-    public fun create_lock_object<T>(
+    public entry fun create_lock_object<T>(
         clock: &Clock,
         withdrawal_ms: u64,
         public_withdrawal_ms: u64,
@@ -157,7 +157,7 @@ module oneinch_move::oneinch_move {
 
     /// Withdraws from the lock. Requires only knowledge of the secret, and proper timelock zone.
     #[allow(lint(self_transfer))]
-    public fun withdraw<T>(lock: LockObject<T>, clock:&Clock, secret: vector<u8>, ctx: &mut TxContext) {
+    public entry fun withdraw<T>(lock: LockObject<T>, clock:&Clock, secret: vector<u8>, ctx: &mut TxContext) {
         let now = clock::timestamp_ms(clock);
         assert!(now >= lock.withdrawal, EWithdrawNotAvailable);
         if (now < lock.public_withdrawal) {
@@ -184,7 +184,7 @@ module oneinch_move::oneinch_move {
 
     /// Cancels the lock. Everyone can cancel the lock but the initiator has an exclusive time window to cancel the lock before the public.
     #[allow(lint(self_transfer))]
-    public fun cancel<T>(lock: LockObject<T>, clock: &Clock, ctx: &mut TxContext) {
+    public entry fun cancel<T>(lock: LockObject<T>, clock: &Clock, ctx: &mut TxContext) {
         let now = clock::timestamp_ms(clock);
         assert!(now >= lock.cancellation, ECancelNotAvailable);
         if (now < lock.public_cancellation) {
