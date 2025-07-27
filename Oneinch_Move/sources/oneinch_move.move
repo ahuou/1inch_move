@@ -1,8 +1,3 @@
-/// Module: htlc
-/// HTLC implementation compatible with <https://github.com/decred/atomicswap> hence with many more projects which conform to it. 
-/// Basically this enables [Decred Atomic Swaps](https://docs.decred.org/advanced/atomic-swap/) for any `Coin` on Sui 
-/// (with addresses not on deny-list) if somebody would want to implement that.
-/// 
 /// WARNING: It's not possible to check if the hash time locked `Coin` is regulated or its metadata can be altered during the lock-time, 
 /// *so it's duty of the downstream off-chain to check* that the `Coin` isn't regulated, frozen, or if the user takes those 
 /// risk participating in the deal. *Note, that's equaly important at the audit phase of the protocol.*
@@ -13,15 +8,11 @@
 /// ability to redeem the asset leaving it to be refunded by the counterparty.
 /// 
 /// # tests
-/// After adding some test code it became clear to me that proper tests for this should involve node RPC calls due to the nature of 
-/// the protocol. Hence presented tests are somewhat superficial; and still they're divided in two modules: 
-/// one adapts test from an Ethereum project and another checks error handling introduced here.
 module oneinch_move::oneinch_move {
     use std::hash;
 
     use sui::coin::Coin;
     use sui::clock::{Self, Clock};
-
     use sui::event;
 
 
@@ -35,7 +26,7 @@ module oneinch_move::oneinch_move {
     // `Coin` is essential here a) to be able to transfer it to user accounts, and b) to be able communicate what kind of asset was indeed locked
     // `Balance` won't be inspectable via a RPC in the same way.
     #[allow(lint(coin_field))] 
-    /// Representation of the hash time lock itself.
+    // Representation of the hash time lock itself.
     // how to prevent from burning the lock (so that refund won't be possible)? should it be shared?
     /*      design decision: it can be either shared or object-owned (by the module itself); the later entites `store` and everything it needs (incl. fees), 
     the former requires sequencing, *but* the wrapped `Coin` do requires that anyway, so this requirements comes for free */
@@ -63,7 +54,8 @@ module oneinch_move::oneinch_move {
         secret_length: u8,
         /// locked `Coin` 
         coin: Coin<T>,
-        // hash: string::String // could be cool to have different hash variants, but it's always SHA-2 SHA256 in all implementations around
+        /// safety deposit for the lock
+        safety_deposit: Coin<T>,
     }
 
     public struct NewLockEvent has copy, drop {
@@ -90,6 +82,7 @@ module oneinch_move::oneinch_move {
         /// byte length of the secret
         secret_length: u8,
     }
+
     public struct LockClaimedEvent has copy, drop {
         /// `UID` of the lock redeemed
         lock: ID,
@@ -98,11 +91,19 @@ module oneinch_move::oneinch_move {
         /// address initiated the claim
         claimer: address
     }
+
     public struct LockCancelledEvent has copy, drop {
         /// `UID` of the lock cancelled
         lock: ID,
         /// address initiated the cancellation
         canceller: address,
+    }
+
+    public struct SafetyDepositClaimedEvent has copy, drop {
+        /// `UID` of the lock
+        lock: ID,
+        /// address that claimed the safety deposit
+        receiver: address,
     }
 
     /// Creates a new hash time lock.
@@ -113,7 +114,11 @@ module oneinch_move::oneinch_move {
         public_withdrawal_ms: u64,
         cancellation_ms: u64,
         public_cancellation_ms: u64,
-        hashed: vector<u8>, target: address, refund: address, amount: Coin<T>,
+        hashed: vector<u8>, 
+        target: address, 
+        refund: address, 
+        amount: Coin<T>, 
+        deposit: Coin<T>,
         secret_length: u8,
         ctx: &mut TxContext
     ) {
@@ -129,8 +134,9 @@ module oneinch_move::oneinch_move {
             refund_adr: refund,
             target_adr: target,
             initiator: ctx.sender(),
-            coin: amount,
-            secret_length
+            coin: amount, 
+            secret_length,
+            safety_deposit: deposit,
         };
         
         event::emit(NewLockEvent{
@@ -148,28 +154,15 @@ module oneinch_move::oneinch_move {
         });
         transfer::share_object(lock);
     }
-    /// `create_lock_object` which defaults to 48 hours
-    /*public fun create_lock_object_48<T>(
-        clock: &Clock,
-        hashed: vector<u8>, target: address, refund: address, amount: Coin<T>,
-        secret_length: u8,
-        ctx: &mut TxContext
-    ) {
-        create_lock_object(
-            clock, 
-            172800000,
-            hashed, target, refund, amount, secret_length, ctx
-        );
-    }
-    */
-    
+
     /// Withdraws from the lock. Requires only knowledge of the secret, and proper timelock zone.
+    #[allow(lint(self_transfer))]
     public fun withdraw<T>(lock: LockObject<T>, clock:&Clock, secret: vector<u8>, ctx: &mut TxContext) {
         let now = clock::timestamp_ms(clock);
         assert!(now >= lock.withdrawal, EWithdrawNotAvailable);
         if (now < lock.public_withdrawal) {
             assert!(ctx.sender() == lock.initiator, EWithdrawNotAllowed);
-        }
+        };
         assert!(lock.secret_length as u64 == secret.length(), ESecretLengthWrong); 
         assert!(&hash::sha2_256(secret) == &lock.hashed, ESecretPreimageWrong);
         
@@ -178,24 +171,38 @@ module oneinch_move::oneinch_move {
             secret: secret,
             claimer: ctx.sender()
         });
-        let LockObject{id, coin, target_adr, ..} = lock;
+        event::emit(SafetyDepositClaimedEvent{
+            lock: sui::object::id(&lock),
+            receiver: ctx.sender()
+        });
+
+        let LockObject{id, coin, target_adr, safety_deposit, ..} = lock;
+        transfer::public_transfer(safety_deposit, ctx.sender());
         transfer::public_transfer(coin, target_adr);
         object::delete(id);
     }
 
     /// Cancels the lock. Everyone can cancel the lock but the initiator has an exclusive time window to cancel the lock before the public.
+    #[allow(lint(self_transfer))]
     public fun cancel<T>(lock: LockObject<T>, clock: &Clock, ctx: &mut TxContext) {
         let now = clock::timestamp_ms(clock);
         assert!(now >= lock.cancellation, ECancelNotAvailable);
         if (now < lock.public_cancellation) {
             assert!(ctx.sender() == lock.initiator, ECancelNotAllowed);
-        }
+        };
 
         event::emit(LockCancelledEvent{
             lock: sui::object::id(&lock),
             canceller: ctx.sender()
         });
-        let LockObject{id, coin, refund_adr, ..} = lock;
+
+        event::emit(SafetyDepositClaimedEvent{
+            lock: sui::object::id(&lock),
+            receiver: ctx.sender()
+        });
+
+        let LockObject{id, coin, refund_adr, safety_deposit, ..} = lock;
+        transfer::public_transfer(safety_deposit, ctx.sender());
         transfer::public_transfer(coin, refund_adr);
         object::delete(id);
     }
