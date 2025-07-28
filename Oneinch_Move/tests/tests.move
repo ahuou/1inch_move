@@ -54,11 +54,11 @@ module oneinch_move::chatch_tests {
             4_600_000,  // cancellation_ms
             4_660_000,     // public_cancellation_ms
             copy hashed, 
+            ADDR_REFUND,
             ADDR_TARGET, 
-            ADDR_REFUND, 
+            32, //secret_length
             coin_the, 
             deposit_the,
-            32, //secret_length
             scenario.ctx()
         );
 
@@ -115,11 +115,11 @@ module oneinch_move::chatch_tests {
             4_600_000,  // cancellation_ms
             4_660_000,     // public_cancellation_ms
             copy hashed, 
+            ADDR_REFUND,
             ADDR_TARGET, 
-            ADDR_REFUND, 
+            32, //secret_length
             coin_the, 
             deposit_the,
-            32, //secret_length
             scenario.ctx()
         );
 
@@ -174,15 +174,15 @@ module oneinch_move::chatch_tests {
         oneinch_move::create_lock_object(
             &clock_the, 
             3_600_000,  // withdrawal_ms
-            3_660_000,  // public_withdrawal_ms  
+            3_660_000,     // public_withdrawal_ms  
             4_600_000,  // cancellation_ms
-            4_660_000,  // public_cancellation_ms
+            4_660_000,     // public_cancellation_ms
             copy hashed, 
+            ADDR_REFUND,
             ADDR_TARGET, 
-            ADDR_REFUND, 
+            32, //secret_length
             coin_the, 
             deposit_the,
-            32, 
             scenario.ctx()
         );
 
@@ -233,11 +233,11 @@ module oneinch_move::chatch_tests {
             4_600_000,  // cancellation_ms
             4_660_000,     // public_cancellation_ms
             copy hashed, 
+            ADDR_REFUND,
             ADDR_TARGET, 
-            ADDR_REFUND, 
+            32, //secret_length
             coin_the, 
             deposit_the,
-            32, 
             scenario.ctx()
         );
 
@@ -285,11 +285,11 @@ module oneinch_move::chatch_tests {
             4_600_000,  // cancellation_ms
             4_660_000,     // public_cancellation_ms
             copy hashed, 
+            ADDR_REFUND,
             ADDR_TARGET, 
-            ADDR_REFUND, 
+            32, //secret_length
             coin_the, 
             deposit_the,
-            32, 
             scenario.ctx()
         );
 
@@ -334,15 +334,15 @@ module oneinch_move::chatch_tests {
         oneinch_move::create_lock_object(
             &clock_the, 
             3_600_000,  // withdrawal_ms
-            3_660_000,  // public_withdrawal_ms  
+            3_660_000,     // public_withdrawal_ms  
             4_600_000,  // cancellation_ms
-            4_660_000,  // public_cancellation_ms
+            4_660_000,     // public_cancellation_ms
             copy hashed, 
+            ADDR_REFUND,
             ADDR_TARGET, 
-            ADDR_REFUND, 
+            32, //secret_length
             coin_the, 
             deposit_the,
-            32, 
             scenario.ctx()
         );
 
@@ -389,15 +389,15 @@ module oneinch_move::chatch_tests {
         oneinch_move::create_lock_object(
             &clock_the, 
             3_600_000,  // withdrawal_ms
-            3_660_000,  // public_withdrawal_ms  
+            3_660_000,     // public_withdrawal_ms  
             4_600_000,  // cancellation_ms
-            4_660_000,  // public_cancellation_ms
+            4_660_000,     // public_cancellation_ms
             copy hashed, 
+            ADDR_REFUND,
             ADDR_TARGET, 
-            ADDR_REFUND, 
+            32, //secret_length
             coin_the, 
             deposit_the,
-            32, 
             scenario.ctx()
         );
 
@@ -445,11 +445,11 @@ module oneinch_move::chatch_tests {
             4_600_000,  // cancellation_ms
             4_660_000,     // public_cancellation_ms
             copy hashed, 
+            ADDR_REFUND,
             ADDR_TARGET, 
-            ADDR_REFUND, 
+            32, //secret_length
             coin_the, 
             deposit_the,
-            32, //secret_length
             scenario.ctx()
         );
 
@@ -498,11 +498,11 @@ module oneinch_move::chatch_tests {
             4_600_000,  // cancellation_ms
             4_660_000,     // public_cancellation_ms
             copy hashed, 
+            ADDR_REFUND,
             ADDR_TARGET, 
-            ADDR_REFUND, 
+            32, //secret_length
             coin_the, 
             deposit_the,
-            32, 
             scenario.ctx()
         );
 
@@ -563,11 +563,11 @@ module oneinch_move::chatch_tests {
             4_600_000,  // cancellation_ms
             4_660_000,     // public_cancellation_ms
             copy hashed, 
+            ADDR_REFUND,
             ADDR_TARGET, 
-            ADDR_REFUND, 
+            32, //secret_length
             coin_the, 
             deposit_the,
-            32, 
             scenario.ctx()
         );
 
@@ -629,11 +629,11 @@ module oneinch_move::chatch_tests {
             4_600_000,  // cancellation_ms
             4_660_000,     // public_cancellation_ms
             copy hashed, 
+            ADDR_REFUND,
             ADDR_TARGET, 
-            ADDR_REFUND, 
+            32, //secret_length
             coin_the, 
             deposit_the,
-            32, 
             scenario.ctx()
         );
 
