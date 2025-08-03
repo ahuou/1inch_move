@@ -164,7 +164,7 @@ module oneinch_move::oneinch_move {
             assert!(ctx.sender() == lock.initiator, EWithdrawNotAllowed);
         };
         assert!(lock.secret_length as u64 == secret.length(), ESecretLengthWrong); 
-        assert!(&hash::sha2_256(secret) == &lock.hashed, ESecretPreimageWrong);
+        assert!(&hash::keccak256(secret) == &lock.hashed, ESecretPreimageWrong);
         
         event::emit(LockClaimedEvent{
             lock: sui::object::id(&lock),
