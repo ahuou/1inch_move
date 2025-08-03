@@ -51,7 +51,6 @@ fun new(ctx: &mut TxContext): Balance<SUI> {
     total_sui
 }
 
-#[allow(lint(public_entry))]
 public entry fun transfer(c: coin::Coin<SUI>, recipient: address) {
     transfer::public_transfer(c, recipient)
 }

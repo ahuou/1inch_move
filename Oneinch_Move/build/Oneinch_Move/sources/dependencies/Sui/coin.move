@@ -160,7 +160,6 @@ public fun put<T>(balance: &mut Balance<T>, coin: Coin<T>) {
 
 // === Base Coin functionality ===
 
-#[allow(lint(public_entry))]
 /// Consume the coin `c` and add its value to `self`.
 /// Aborts if `c.value + self.value > U64_MAX`
 public entry fun join<T>(self: &mut Coin<T>, c: Coin<T>) {
@@ -305,7 +304,6 @@ public fun mint_balance<T>(cap: &mut TreasuryCap<T>, value: u64): Balance<T> {
     cap.total_supply.increase_supply(value)
 }
 
-#[allow(lint(public_entry))]
 /// Destroy the coin `c` and decrease the total supply in `cap`
 /// accordingly.
 public entry fun burn<T>(cap: &mut TreasuryCap<T>, c: Coin<T>): u64 {
@@ -404,7 +402,6 @@ public fun deny_list_v2_is_global_pause_enabled_next_epoch<T>(deny_list: &DenyLi
 
 // === Entrypoints ===
 
-#[allow(lint(public_entry))]
 /// Mint `amount` of `Coin` and send it to `recipient`. Invokes `mint()`.
 public entry fun mint_and_transfer<T>(
     c: &mut TreasuryCap<T>,
@@ -417,7 +414,6 @@ public entry fun mint_and_transfer<T>(
 
 // === Update coin metadata ===
 
-#[allow(lint(public_entry))]
 /// Update name of the coin in `CoinMetadata`
 public entry fun update_name<T>(
     _treasury: &TreasuryCap<T>,
@@ -427,7 +423,6 @@ public entry fun update_name<T>(
     metadata.name = name;
 }
 
-#[allow(lint(public_entry))]
 /// Update the symbol of the coin in `CoinMetadata`
 public entry fun update_symbol<T>(
     _treasury: &TreasuryCap<T>,
@@ -437,7 +432,6 @@ public entry fun update_symbol<T>(
     metadata.symbol = symbol;
 }
 
-#[allow(lint(public_entry))]
 /// Update the description of the coin in `CoinMetadata`
 public entry fun update_description<T>(
     _treasury: &TreasuryCap<T>,
@@ -447,7 +441,6 @@ public entry fun update_description<T>(
     metadata.description = description;
 }
 
-#[allow(lint(public_entry))]
 /// Update the url of the coin in `CoinMetadata`
 public entry fun update_icon_url<T>(
     _treasury: &TreasuryCap<T>,
