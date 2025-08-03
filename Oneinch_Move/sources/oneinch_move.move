@@ -115,11 +115,11 @@ module oneinch_move::oneinch_move {
         cancellation_ms: u64,
         public_cancellation_ms: u64,
         hashed: vector<u8>, 
-        refund: address, 
         target: address, 
-        secret_length: u8,
+        refund: address, 
         amount: Coin<T>, 
         deposit: Coin<T>,
+        secret_length: u8,
         ctx: &mut TxContext
     ) {
         let now = clock::timestamp_ms(clock);
@@ -134,8 +134,8 @@ module oneinch_move::oneinch_move {
             refund_adr: refund,
             target_adr: target,
             initiator: ctx.sender(),
+            coin: amount, 
             secret_length,
-            coin: amount,  
             safety_deposit: deposit,
         };
         
