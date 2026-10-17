@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="800" viewBox="0 0 1280 800" font-family="Inter, 'DejaVu Sans', Arial, sans-serif">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#cbd5e1"/>
+    </marker>
+    <marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#facc15"/>
+    </marker>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0d1420"/><stop offset="1" stop-color="#0a0f18"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="800" fill="url(#bg)"/>
+
+  <!-- title -->
+  <text x="48" y="62" fill="#f1f5f9" font-size="30" font-weight="700" letter-spacing="1">1inch Fusion+ on Sui</text>
+  <text x="48" y="92" fill="#94a3b8" font-size="17">Atomic Ethereum → Sui swap: two hashlock + timelock escrows, one secret</text>
+
+  <!-- Ethereum lane -->
+  <rect x="40" y="122" width="1200" height="170" rx="16" fill="#111a2b" stroke="#1e3a5f"/>
+  <text x="64" y="152" fill="#60a5fa" font-size="15" font-weight="700" letter-spacing="3">ETHEREUM  (source chain)</text>
+  <rect x="70" y="172" width="210" height="96" rx="12" fill="#0f2238" stroke="#3b82f6"/>
+  <text x="175" y="206" fill="#e2e8f0" font-size="18" font-weight="700" text-anchor="middle">Maker</text>
+  <text x="175" y="230" fill="#94a3b8" font-size="14" text-anchor="middle">signs order off-chain,</text>
+  <text x="175" y="250" fill="#94a3b8" font-size="14" text-anchor="middle">keeps secret s</text>
+  <rect x="520" y="172" width="300" height="96" rx="12" fill="#0f2238" stroke="#3b82f6"/>
+  <text x="670" y="206" fill="#e2e8f0" font-size="18" font-weight="700" text-anchor="middle">EscrowSrc (1inch LOP)</text>
+  <text x="670" y="230" fill="#94a3b8" font-size="14" text-anchor="middle">maker's tokens + resolver deposit</text>
+  <text x="670" y="250" fill="#94a3b8" font-size="14" text-anchor="middle">locked to H = keccak256(s)</text>
+
+  <!-- Resolver -->
+  <rect x="1000" y="322" width="220" height="130" rx="14" fill="#1f1a0a" stroke="#facc15" stroke-width="1.5"/>
+  <text x="1110" y="358" fill="#facc15" font-size="19" font-weight="700" text-anchor="middle">Resolver</text>
+  <text x="1110" y="384" fill="#cbd5e1" font-size="14" text-anchor="middle">wins Dutch auction,</text>
+  <text x="1110" y="404" fill="#cbd5e1" font-size="14" text-anchor="middle">fronts liquidity on</text>
+  <text x="1110" y="424" fill="#cbd5e1" font-size="14" text-anchor="middle">both chains</text>
+
+  <!-- Sui lane -->
+  <rect x="40" y="482" width="1200" height="170" rx="16" fill="#0f1d24" stroke="#155e75"/>
+  <text x="64" y="512" fill="#22d3ee" font-size="15" font-weight="700" letter-spacing="3">SUI  (destination chain, Move)</text>
+  <rect x="520" y="532" width="300" height="96" rx="12" fill="#0c2a33" stroke="#06b6d4"/>
+  <text x="670" y="564" fill="#e2e8f0" font-size="18" font-weight="700" text-anchor="middle">LockObject&lt;T&gt; (shared)</text>
+  <text x="670" y="588" fill="#94a3b8" font-size="14" text-anchor="middle">resolver's coins + safety deposit</text>
+  <text x="670" y="608" fill="#94a3b8" font-size="14" text-anchor="middle">same H, 4 timelock stamps</text>
+  <rect x="70" y="532" width="210" height="96" rx="12" fill="#0c2a33" stroke="#06b6d4"/>
+  <text x="175" y="568" fill="#e2e8f0" font-size="18" font-weight="700" text-anchor="middle">Maker on Sui</text>
+  <text x="175" y="594" fill="#94a3b8" font-size="14" text-anchor="middle">target_adr receives</text>
+  <text x="175" y="614" fill="#94a3b8" font-size="14" text-anchor="middle">the Coin&lt;T&gt;</text>
+
+  <!-- arrows -->
+  <!-- 1 resolver deploys src -->
+  <path d="M1040 322 C1000 270, 900 230, 824 222" fill="none" stroke="#cbd5e1" stroke-width="2" marker-end="url(#a)"/>
+  <circle cx="955" cy="250" r="14" fill="#facc15"/><text x="955" y="255" font-size="15" font-weight="700" text-anchor="middle" fill="#111">1</text>
+  <!-- 2 resolver creates lock -->
+  <path d="M1040 452 C1000 510, 900 560, 824 576" fill="none" stroke="#cbd5e1" stroke-width="2" marker-end="url(#a)"/>
+  <circle cx="955" cy="532" r="14" fill="#facc15"/><text x="955" y="537" font-size="15" font-weight="700" text-anchor="middle" fill="#111">2</text>
+  <!-- 3 maker reveals secret -->
+  <path d="M175 268 L175 380 L990 380" fill="none" stroke="#facc15" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#g)"/>
+  <circle cx="200" cy="380" r="14" fill="#facc15"/><text x="200" y="385" font-size="15" font-weight="700" text-anchor="middle" fill="#111">3</text>
+  <text x="230" y="370" fill="#facc15" font-size="14">both escrows final → maker (via relayer) reveals s</text>
+  <!-- 4 withdraw on sui -->
+  <path d="M520 580 L284 580" fill="none" stroke="#cbd5e1" stroke-width="2" marker-end="url(#a)"/>
+  <circle cx="400" cy="560" r="14" fill="#facc15"/><text x="400" y="565" font-size="15" font-weight="700" text-anchor="middle" fill="#111">4</text>
+  <text x="400" y="610" fill="#cbd5e1" font-size="13" text-anchor="middle">withdraw(s): coin → maker</text>
+  <!-- 5 withdraw on eth -->
+  <path d="M820 236 C900 300, 980 330, 1000 350" fill="none" stroke="#cbd5e1" stroke-width="2" marker-end="url(#a)" stroke-dasharray="0"/>
+  <circle cx="860" cy="290" r="14" fill="#facc15"/><text x="860" y="295" font-size="15" font-weight="700" text-anchor="middle" fill="#111">5</text>
+  <text x="300" y="440" fill="#94a3b8" font-size="14">step 4 emits s on Sui (LockClaimedEvent) → step 5: resolver reuses s to unlock EscrowSrc</text>
+
+  <!-- timelock bar -->
+  <text x="48" y="694" fill="#94a3b8" font-size="14" letter-spacing="2">TIMELOCK WINDOWS (per escrow, relative to creation)</text>
+  <g font-size="13" text-anchor="middle">
+    <rect x="48"  y="708" width="180" height="40" rx="6" fill="#334155"/><text x="138" y="733" fill="#e2e8f0">finality lock</text>
+    <rect x="232" y="708" width="250" height="40" rx="6" fill="#166534"/><text x="357" y="733" fill="#e2e8f0">resolver-only withdraw</text>
+    <rect x="486" y="708" width="250" height="40" rx="6" fill="#15803d"/><text x="611" y="733" fill="#e2e8f0">public withdraw (anyone)</text>
+    <rect x="740" y="708" width="240" height="40" rx="6" fill="#9a3412"/><text x="860" y="733" fill="#e2e8f0">resolver-only cancel</text>
+    <rect x="984" y="708" width="248" height="40" rx="6" fill="#b91c1c"/><text x="1108" y="733" fill="#e2e8f0">public cancel → refund</text>
+  </g>
+  <text x="48" y="776" fill="#64748b" font-size="13">withdrawal · public_withdrawal · cancellation · public_cancellation  —  checked against sui::clock in oneinch_move.move</text>
+</svg>
