@@ -1,0 +1,12 @@
+# Move build output (regenerate with `sui move build`)
+build/
+**/build/
+
+# Local env / keys
+.env
+*.keystore
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/

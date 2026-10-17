@@ -9,7 +9,7 @@
 /// 
 /// # tests
 module oneinch_move::oneinch_move {
-    use std::hash;
+    use sui::hash;
 
     use sui::coin::Coin;
     use sui::clock::{Self, Clock};
@@ -115,11 +115,11 @@ module oneinch_move::oneinch_move {
         cancellation_ms: u64,
         public_cancellation_ms: u64,
         hashed: vector<u8>, 
-        target: address, 
         refund: address, 
+        target: address, 
+        secret_length: u8,
         amount: Coin<T>, 
         deposit: Coin<T>,
-        secret_length: u8,
         ctx: &mut TxContext
     ) {
         let now = clock::timestamp_ms(clock);
@@ -164,7 +164,7 @@ module oneinch_move::oneinch_move {
             assert!(ctx.sender() == lock.initiator, EWithdrawNotAllowed);
         };
         assert!(lock.secret_length as u64 == secret.length(), ESecretLengthWrong); 
-        assert!(&hash::keccak256(secret) == &lock.hashed, ESecretPreimageWrong);
+        assert!(hash::keccak256(&secret) == lock.hashed, ESecretPreimageWrong);
         
         event::emit(LockClaimedEvent{
             lock: sui::object::id(&lock),

@@ -7,7 +7,7 @@ module oneinch_move::chatch_tests {
     use oneinch_move::oneinch_move::{Self};
     use sui::random::{Self, Random};
     use sui::test_scenario;
-    use std::hash;
+    use sui::hash;
     use sui::clock::{Self};
 
     use sui::sui::SUI;
@@ -36,7 +36,7 @@ module oneinch_move::chatch_tests {
         let secret = 
             random_the.new_generator(scenario.ctx())
                 .generate_bytes(32);
-        let hashed = hash::sha2_256(copy secret);
+        let hashed = hash::keccak256(&secret);
 
         let coin_the = 
             coin::mint_for_testing<SUI>(10_000_000_000, scenario.ctx());
@@ -97,7 +97,7 @@ module oneinch_move::chatch_tests {
         let secret = 
             random_the.new_generator(scenario.ctx())
                 .generate_bytes(32);
-        let hashed = hash::sha2_256(copy secret);
+        let hashed = hash::keccak256(&secret);
 
         let coin_the = 
             coin::mint_for_testing<SUI>(10_000_000_000, scenario.ctx());
@@ -163,7 +163,7 @@ module oneinch_move::chatch_tests {
         let random_the = scenario.take_shared<Random>();
         let mut generator_the = random_the.new_generator(scenario.ctx());
         let secret = generator_the.generate_bytes(32);
-        let hashed = hash::sha2_256(copy secret);
+        let hashed = hash::keccak256(&secret);
 
         let coin_the = 
             coin::mint_for_testing<SUI>(10_000_000_000, scenario.ctx());
@@ -218,7 +218,7 @@ module oneinch_move::chatch_tests {
         let secret = 
             random_the.new_generator(scenario.ctx())
                 .generate_bytes(32);
-        let hashed = hash::sha2_256(copy secret);
+        let hashed = hash::keccak256(&secret);
 
         let coin_the = 
             coin::mint_for_testing<SUI>(10_000_000_000, scenario.ctx());
@@ -270,7 +270,7 @@ module oneinch_move::chatch_tests {
         let secret = 
             random_the.new_generator(scenario.ctx())
                 .generate_bytes(32);
-        let hashed = hash::sha2_256(copy secret);
+        let hashed = hash::keccak256(&secret);
 
         let coin_the = 
             coin::mint_for_testing<SUI>(10_000_000_000, scenario.ctx());
@@ -323,7 +323,7 @@ module oneinch_move::chatch_tests {
         let secret = 
             random_the.new_generator(scenario.ctx())
                 .generate_bytes(32);
-        let hashed = hash::sha2_256(copy secret);
+        let hashed = hash::keccak256(&secret);
 
         let coin_the = 
             coin::mint_for_testing<SUI>(10_000_000_000, scenario.ctx());
@@ -378,7 +378,7 @@ module oneinch_move::chatch_tests {
         let secret = 
             random_the.new_generator(scenario.ctx())
                 .generate_bytes(32);
-        let hashed = hash::sha2_256(copy secret);
+        let hashed = hash::keccak256(&secret);
 
         let coin_the = 
             coin::mint_for_testing<SUI>(10_000_000_000, scenario.ctx());
@@ -430,7 +430,7 @@ module oneinch_move::chatch_tests {
         let secret = 
             random_the.new_generator(scenario.ctx())
                 .generate_bytes(32);
-        let hashed = hash::sha2_256(copy secret);
+        let hashed = hash::keccak256(&secret);
 
         let coin_the = 
             coin::mint_for_testing<SUI>(10_000_000_000, scenario.ctx());
@@ -480,7 +480,7 @@ module oneinch_move::chatch_tests {
         let random_the = scenario.take_shared<Random>();
         let mut generator_the = random_the.new_generator(scenario.ctx());
         let secret = generator_the.generate_bytes(32);
-        let hashed = hash::sha2_256(copy secret);
+        let hashed = hash::keccak256(&secret);
 
         let coin_the = 
             coin::mint_for_testing<SUI>(10_000_000_000, scenario.ctx());
@@ -545,7 +545,7 @@ module oneinch_move::chatch_tests {
         let random_the = scenario.take_shared<Random>();
         let mut generator_the = random_the.new_generator(scenario.ctx());
         let secret = generator_the.generate_bytes(32);
-        let hashed = hash::sha2_256(copy secret);
+        let hashed = hash::keccak256(&secret);
 
         let coin_the = 
             coin::mint_for_testing<SUI>(10_000_000_000, scenario.ctx());
@@ -611,7 +611,7 @@ module oneinch_move::chatch_tests {
         let random_the = scenario.take_shared<Random>();
         let mut generator_the = random_the.new_generator(scenario.ctx());
         let secret = generator_the.generate_bytes(32);
-        let hashed = hash::sha2_256(copy secret);
+        let hashed = hash::keccak256(&secret);
 
         let coin_the = 
             coin::mint_for_testing<SUI>(10_000_000_000, scenario.ctx());

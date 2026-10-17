@@ -1,522 +1,224 @@
 #[test_only]
+/// Tests for `oneinch_move::partial_fills`: one hashlock-guarded escrow that resolvers
+/// drain in several fills, with the same timelock windows as the base module.
 module oneinch_move::pf_test {
-    use sui::test_scenario::{Self as test, next_tx, ctx};
-    use sui::coin::{Self};
-    use sui::clock::{Self};
+    use sui::test_scenario::{Self as test, Scenario};
+    use sui::coin::{Self, Coin};
+    use sui::clock::{Self, Clock};
     use sui::sui::SUI;
-    use sui::test_utils::assert_eq;
-    use std::string;
     use sui::hash;
-    use oneinch_move::partial_fills::{
-        Self as escrow, CrossChainEscrow, UsedSecretsRegistry
-    };
+    use std::string;
+    use oneinch_move::partial_fills::{Self as escrow, LockObject, UsedSecretsRegistry};
 
-    // Test constants
     const MAKER: address = @0xA;
-    const TAKER: address = @0xB;
+    const TARGET: address = @0xB;
     const RESOLVER1: address = @0xC;
     const RESOLVER2: address = @0xD;
     const RESOLVER3: address = @0xE;
+
     const TOTAL_AMOUNT: u64 = 1000;
-    const PARTIAL_AMOUNT_1: u64 = 300; // 30%
-    const PARTIAL_AMOUNT_2: u64 = 500; // 50%
-    const PARTIAL_AMOUNT_3: u64 = 200; // 20%
-    const ONE_HOUR_MS: u64 = 3600000;
+    const DEPOSIT: u64 = 10;
+
+    // Windows relative to creation (ms): resolver-only withdraw from 1h,
+    // public withdraw from 2h, resolver-only cancel from 3h, public cancel from 4h.
+    const WITHDRAWAL: u64 = 3_600_000;
+    const PUBLIC_WITHDRAWAL: u64 = 7_200_000;
+    const CANCELLATION: u64 = 10_800_000;
+    const PUBLIC_CANCELLATION: u64 = 14_400_000;
+
+    const SECRET: vector<u8> = b"test_secret_32_bytes_long_______";
+
+    /// Starts a scenario, shares the registry and a 1000-MIST lock created by MAKER.
+    fun setup(): (Scenario, Clock) {
+        let mut scenario = test::begin(MAKER);
+        let clock = clock::create_for_testing(scenario.ctx());
+        escrow::init_for_testing(scenario.ctx());
+        scenario.next_tx(MAKER);
+
+        let secret = SECRET;
+        escrow::createLockObject<SUI>(
+            &clock,
+            WITHDRAWAL,
+            PUBLIC_WITHDRAWAL,
+            CANCELLATION,
+            PUBLIC_CANCELLATION,
+            hash::keccak256(&secret),
+            TARGET,
+            MAKER,
+            coin::mint_for_testing<SUI>(TOTAL_AMOUNT, scenario.ctx()),
+            coin::mint_for_testing<SUI>(DEPOSIT, scenario.ctx()),
+            (secret.length() as u8),
+            string::utf8(b"0x1234567890abcdef"),
+            scenario.ctx(),
+        );
+        (scenario, clock)
+    }
+
+    /// One partial fill as `who`; returns nothing, the coin goes to `who`.
+    fun fill(scenario: &mut Scenario, clock: &Clock, who: address, amount: u64) {
+        scenario.next_tx(who);
+        let mut lock = scenario.take_shared<LockObject<SUI>>();
+        let mut registry = scenario.take_shared<UsedSecretsRegistry>();
+        escrow::withdrawPartial(&mut lock, &mut registry, clock, SECRET, amount, scenario.ctx());
+        test::return_shared(lock);
+        test::return_shared(registry);
+    }
+
+    fun remaining(scenario: &mut Scenario): (u64, bool) {
+        let lock = scenario.take_shared<LockObject<SUI>>();
+        let left = escrow::remainingAmount(&lock);
+        let done = escrow::isFilled(&lock);
+        test::return_shared(lock);
+        (left, done)
+    }
+
+    fun received(scenario: &mut Scenario, who: address): u64 {
+        scenario.next_tx(who);
+        let c = scenario.take_from_address<Coin<SUI>>(who);
+        let v = c.value();
+        test::return_to_address(who, c);
+        v
+    }
 
     #[test]
     fun test_partial_fill_basic() {
-        let mut scenario = test::begin(MAKER);
-        let mut clock = clock::create_for_testing(ctx(&mut scenario));
-        
-        // Initialize the module
-        escrow::init_for_testing(ctx(&mut scenario));
-        
-        next_tx(&mut scenario, MAKER);
-        
-        // Create test data
-        let secret = b"test_secret";
-        let hash_lock = hash::keccak256(&secret);
-        let time_lock = clock::timestamp_ms(&clock) + ONE_HOUR_MS;
-        let coin = coin::mint_for_testing<SUI>(TOTAL_AMOUNT, ctx(&mut scenario));
-        let ethereum_order_hash = string::utf8(b"0x1234567890abcdef");
-        
-        // Create escrow with open taker (address 0x0 for anyone to fill)
-        let escrow_id = escrow::create_and_share_escrow<SUI>(
-            coin,
-            @0x0, // Open to any resolver
-            hash_lock,
-            time_lock,
-            ethereum_order_hash,
-            &clock,
-            ctx(&mut scenario)
-        );
-        
-        assert!(sui::object::id_to_address(&escrow_id) != @0x0, 0);
-        
-        next_tx(&mut scenario, RESOLVER1);
-        
-        // Get shared objects
-        let mut escrow = test::take_shared<CrossChainEscrow<SUI>>(&scenario);
-        let mut registry = test::take_shared<UsedSecretsRegistry>(&scenario);
-        
-        // Verify initial escrow state
-        let (maker, taker, total_amount, remaining_amount, stored_hash_lock, stored_time_lock, is_filled, created_at, stored_ethereum_order_hash) = 
-            escrow::get_escrow_info(&escrow);
-        
-        assert_eq(maker, MAKER);
-        assert_eq(taker, @0x0); // Open taker
-        assert_eq(total_amount, TOTAL_AMOUNT);
-        assert_eq(remaining_amount, TOTAL_AMOUNT);
-        assert_eq(stored_hash_lock, hash_lock);
-        assert_eq(stored_time_lock, time_lock);
-        assert_eq(is_filled, false);
-        assert_eq(created_at, clock::timestamp_ms(&clock));
-        assert_eq(stored_ethereum_order_hash, ethereum_order_hash);
-        
-        // Partial fill by Resolver1 (30%)
-        let received_coin_1 = escrow::fill_escrow_partial(
-            &mut escrow,
-            &mut registry,
-            PARTIAL_AMOUNT_1,
-            secret,
-            &clock,
-            ctx(&mut scenario)
-        );
-        
-        // Verify partial fill
-        assert_eq(coin::value(&received_coin_1), PARTIAL_AMOUNT_1);
-        assert_eq(escrow::get_remaining_amount(&escrow), TOTAL_AMOUNT - PARTIAL_AMOUNT_1);
-        
-        let (_, _, _, remaining_amount, _, _, is_filled, _, _) = escrow::get_escrow_info(&escrow);
-        assert_eq(remaining_amount, TOTAL_AMOUNT - PARTIAL_AMOUNT_1);
-        assert_eq(is_filled, false); // Not yet completed
-        
-        // Verify secret was stored
-        let stored_secret = escrow::get_secret(&escrow);
-        assert_eq(stored_secret, secret);
-        
-        coin::burn_for_testing(received_coin_1);
-        test::return_shared(escrow);
+        let (mut scenario, mut clock) = setup();
+        clock.increment_for_testing(WITHDRAWAL);
+
+        fill(&mut scenario, &clock, MAKER, 300);
+        scenario.next_tx(MAKER);
+        let (left, done) = remaining(&mut scenario);
+        assert!(left == 700);
+        assert!(!done);
+        assert!(received(&mut scenario, MAKER) == 300);
+
+        scenario.next_tx(MAKER);
+        let registry = scenario.take_shared<UsedSecretsRegistry>();
+        assert!(escrow::getUsedHashesCount(&registry) == 1);
         test::return_shared(registry);
-        clock::destroy_for_testing(clock);
-        test::end(scenario);
+
+        clock.destroy_for_testing();
+        scenario.end();
     }
 
     #[test]
     fun test_multiple_partial_fills() {
-        let mut scenario = test::begin(MAKER);
-        let mut clock = clock::create_for_testing(ctx(&mut scenario));
-        
-        escrow::init_for_testing(ctx(&mut scenario));
-        next_tx(&mut scenario, MAKER);
-        
-        let secret = b"test_secret";
-        let hash_lock = hash::keccak256(&secret);
-        let time_lock = clock::timestamp_ms(&clock) + ONE_HOUR_MS;
-        let coin = coin::mint_for_testing<SUI>(TOTAL_AMOUNT, ctx(&mut scenario));
-        let ethereum_order_hash = string::utf8(b"0x1234567890abcdef");
-        
-        let escrow_id = escrow::create_and_share_escrow<SUI>(
-            coin,
-            @0x0, // Open to any resolver
-            hash_lock,
-            time_lock,
-            ethereum_order_hash,
-            &clock,
-            ctx(&mut scenario)
-        );
-        
-        // First partial fill by Resolver1
-        next_tx(&mut scenario, RESOLVER1);
-        {
-            let mut escrow = test::take_shared<CrossChainEscrow<SUI>>(&scenario);
-            let mut registry = test::take_shared<UsedSecretsRegistry>(&scenario);
-            
-            let received_coin_1 = escrow::fill_escrow_partial(
-                &mut escrow,
-                &mut registry,
-                PARTIAL_AMOUNT_1,
-                secret,
-                &clock,
-                ctx(&mut scenario)
-            );
-            
-            assert_eq(coin::value(&received_coin_1), PARTIAL_AMOUNT_1);
-            assert_eq(escrow::get_remaining_amount(&escrow), TOTAL_AMOUNT - PARTIAL_AMOUNT_1);
-            
-            coin::burn_for_testing(received_coin_1);
-            test::return_shared(escrow);
-            test::return_shared(registry);
-        };
-        
-        // Second partial fill by Resolver2
-        next_tx(&mut scenario, RESOLVER2);
-        {
-            let mut escrow = test::take_shared<CrossChainEscrow<SUI>>(&scenario);
-            let mut registry = test::take_shared<UsedSecretsRegistry>(&scenario);
-            
-            let received_coin_2 = escrow::fill_escrow_partial(
-                &mut escrow,
-                &mut registry,
-                PARTIAL_AMOUNT_2,
-                secret,
-                &clock,
-                ctx(&mut scenario)
-            );
-            
-            assert_eq(coin::value(&received_coin_2), PARTIAL_AMOUNT_2);
-            assert_eq(escrow::get_remaining_amount(&escrow), TOTAL_AMOUNT - PARTIAL_AMOUNT_1 - PARTIAL_AMOUNT_2);
-            
-            coin::burn_for_testing(received_coin_2);
-            test::return_shared(escrow);
-            test::return_shared(registry);
-        };
-        
-        // Final fill by Resolver3 (should complete the escrow)
-        next_tx(&mut scenario, RESOLVER3);
-        {
-            let mut escrow = test::take_shared<CrossChainEscrow<SUI>>(&scenario);
-            let mut registry = test::take_shared<UsedSecretsRegistry>(&scenario);
-            
-            let received_coin_3 = escrow::fill_escrow_partial(
-                &mut escrow,
-                &mut registry,
-                PARTIAL_AMOUNT_3,
-                secret,
-                &clock,
-                ctx(&mut scenario)
-            );
-            
-            assert_eq(coin::value(&received_coin_3), PARTIAL_AMOUNT_3);
-            assert_eq(escrow::get_remaining_amount(&escrow), 0);
-            
-            // Verify escrow is now completed
-            let (_, _, _, remaining_amount, _, _, is_filled, _, _) = escrow::get_escrow_info(&escrow);
-            assert_eq(remaining_amount, 0);
-            assert_eq(is_filled, true);
-            
-            coin::burn_for_testing(received_coin_3);
-            test::return_shared(escrow);
-            test::return_shared(registry);
-        };
-        
-        clock::destroy_for_testing(clock);
-        test::end(scenario);
+        let (mut scenario, mut clock) = setup();
+        clock.increment_for_testing(WITHDRAWAL);
+
+        fill(&mut scenario, &clock, MAKER, 300);
+        fill(&mut scenario, &clock, MAKER, 500);
+        scenario.next_tx(MAKER);
+        let (left, done) = remaining(&mut scenario);
+        assert!(left == 200);
+        assert!(!done);
+
+        // Same secret reused across fills is recorded only once.
+        let registry = scenario.take_shared<UsedSecretsRegistry>();
+        assert!(escrow::getUsedHashesCount(&registry) == 1);
+        test::return_shared(registry);
+
+        clock.destroy_for_testing();
+        scenario.end();
     }
 
     #[test]
     fun test_fill_escrow_completion() {
-        let mut scenario = test::begin(MAKER);
-        let mut clock = clock::create_for_testing(ctx(&mut scenario));
-        
-        escrow::init_for_testing(ctx(&mut scenario));
-        next_tx(&mut scenario, MAKER);
-        
-        let secret = b"test_secret";
-        let hash_lock = hash::keccak256(&secret);
-        let time_lock = clock::timestamp_ms(&clock) + ONE_HOUR_MS;
-        let coin = coin::mint_for_testing<SUI>(TOTAL_AMOUNT, ctx(&mut scenario));
-        let ethereum_order_hash = string::utf8(b"0x1234567890abcdef");
-        
-        let escrow_id = escrow::create_and_share_escrow<SUI>(
-            coin,
-            TAKER, // Fixed taker
-            hash_lock,
-            time_lock,
-            ethereum_order_hash,
-            &clock,
-            ctx(&mut scenario)
-        );
-        
-        next_tx(&mut scenario, TAKER);
-        
-        let mut escrow = test::take_shared<CrossChainEscrow<SUI>>(&scenario);
-        let mut registry = test::take_shared<UsedSecretsRegistry>(&scenario);
-        
-        // Use fill_escrow (should fill remaining amount)
-        let received_coin = escrow::fill_escrow(
-            &mut escrow,
-            &mut registry,
-            secret,
-            &clock,
-            ctx(&mut scenario)
-        );
-        
-        // Verify full amount received and escrow completed
-        assert_eq(coin::value(&received_coin), TOTAL_AMOUNT);
-        assert_eq(escrow::get_remaining_amount(&escrow), 0);
-        
-        let (_, _, _, remaining_amount, _, _, is_filled, _, _) = escrow::get_escrow_info(&escrow);
-        assert_eq(remaining_amount, 0);
-        assert_eq(is_filled, true);
-        
-        coin::burn_for_testing(received_coin);
-        test::return_shared(escrow);
-        test::return_shared(registry);
-        clock::destroy_for_testing(clock);
-        test::end(scenario);
+        let (mut scenario, mut clock) = setup();
+        clock.increment_for_testing(WITHDRAWAL);
+
+        fill(&mut scenario, &clock, MAKER, 400);
+        fill(&mut scenario, &clock, MAKER, 600);
+        scenario.next_tx(MAKER);
+        let (left, done) = remaining(&mut scenario);
+        assert!(left == 0);
+        assert!(done);
+
+        clock.destroy_for_testing();
+        scenario.end();
     }
 
-    #[test]
-    #[expected_failure(abort_code = oneinch_move::partial_fills::E_INSUFFICIENT_REMAINING_AMOUNT)]
+    #[test, expected_failure(abort_code = escrow::EInsufficientRemainingAmount)]
     fun test_fill_exceeds_remaining() {
-        let mut scenario = test::begin(MAKER);
-        let mut clock = clock::create_for_testing(ctx(&mut scenario));
-        
-        escrow::init_for_testing(ctx(&mut scenario));
-        next_tx(&mut scenario, MAKER);
-        
-        let secret = b"test_secret";
-        let hash_lock = hash::keccak256(&secret);
-        let time_lock = clock::timestamp_ms(&clock) + ONE_HOUR_MS;
-        let coin = coin::mint_for_testing<SUI>(TOTAL_AMOUNT, ctx(&mut scenario));
-        let ethereum_order_hash = string::utf8(b"0x1234567890abcdef");
-        
-        let escrow_id = escrow::create_and_share_escrow<SUI>(
-            coin,
-            @0x0,
-            hash_lock,
-            time_lock,
-            ethereum_order_hash,
-            &clock,
-            ctx(&mut scenario)
-        );
-        
-        next_tx(&mut scenario, RESOLVER1);
-        
-        let mut escrow = test::take_shared<CrossChainEscrow<SUI>>(&scenario);
-        let mut registry = test::take_shared<UsedSecretsRegistry>(&scenario);
-        
-        // Try to fill more than total amount (should fail)
-        let received_coin = escrow::fill_escrow_partial(
-            &mut escrow,
-            &mut registry,
-            TOTAL_AMOUNT + 1,
-            secret,
-            &clock,
-            ctx(&mut scenario)
-        );
-        
-        coin::burn_for_testing(received_coin);
-        test::return_shared(escrow);
-        test::return_shared(registry);
-        clock::destroy_for_testing(clock);
-        test::end(scenario);
+        let (mut scenario, mut clock) = setup();
+        clock.increment_for_testing(WITHDRAWAL);
+
+        fill(&mut scenario, &clock, MAKER, 800);
+        fill(&mut scenario, &clock, MAKER, 300);
+
+        clock.destroy_for_testing();
+        scenario.end();
     }
 
-    #[test]
-    #[expected_failure(abort_code = oneinch_move::partial_fills::E_INVALID_FILL_AMOUNT)]
+    #[test, expected_failure(abort_code = escrow::EInvalidFillAmount)]
     fun test_fill_zero_amount() {
-        let mut scenario = test::begin(MAKER);
-        let mut clock = clock::create_for_testing(ctx(&mut scenario));
-        
-        escrow::init_for_testing(ctx(&mut scenario));
-        next_tx(&mut scenario, MAKER);
-        
-        let secret = b"test_secret";
-        let hash_lock = hash::keccak256(&secret);
-        let time_lock = clock::timestamp_ms(&clock) + ONE_HOUR_MS;
-        let coin = coin::mint_for_testing<SUI>(TOTAL_AMOUNT, ctx(&mut scenario));
-        let ethereum_order_hash = string::utf8(b"0x1234567890abcdef");
-        
-        let escrow_id = escrow::create_and_share_escrow<SUI>(
-            coin,
-            @0x0,
-            hash_lock,
-            time_lock,
-            ethereum_order_hash,
-            &clock,
-            ctx(&mut scenario)
-        );
-        
-        next_tx(&mut scenario, RESOLVER1);
-        
-        let mut escrow = test::take_shared<CrossChainEscrow<SUI>>(&scenario);
-        let mut registry = test::take_shared<UsedSecretsRegistry>(&scenario);
-        
-        // Try to fill with zero amount (should fail)
-        let received_coin = escrow::fill_escrow_partial(
-            &mut escrow,
-            &mut registry,
-            0,
-            secret,
-            &clock,
-            ctx(&mut scenario)
-        );
-        
-        coin::burn_for_testing(received_coin);
-        test::return_shared(escrow);
-        test::return_shared(registry);
-        clock::destroy_for_testing(clock);
-        test::end(scenario);
+        let (mut scenario, mut clock) = setup();
+        clock.increment_for_testing(WITHDRAWAL);
+
+        fill(&mut scenario, &clock, MAKER, 0);
+
+        clock.destroy_for_testing();
+        scenario.end();
     }
 
     #[test]
     fun test_cancel_partially_filled_escrow() {
-        let mut scenario = test::begin(MAKER);
-        let mut clock = clock::create_for_testing(ctx(&mut scenario));
-        
-        escrow::init_for_testing(ctx(&mut scenario));
-        next_tx(&mut scenario, MAKER);
-        
-        let secret = b"test_secret";
-        let hash_lock = hash::keccak256(&secret);
-        let time_lock = clock::timestamp_ms(&clock) + ONE_HOUR_MS;
-        let coin = coin::mint_for_testing<SUI>(TOTAL_AMOUNT, ctx(&mut scenario));
-        let ethereum_order_hash = string::utf8(b"0x1234567890abcdef");
-        
-        let escrow_id = escrow::create_and_share_escrow<SUI>(
-            coin,
-            @0x0,
-            hash_lock,
-            time_lock,
-            ethereum_order_hash,
-            &clock,
-            ctx(&mut scenario)
-        );
-        
-        // Partial fill
-        next_tx(&mut scenario, RESOLVER1);
-        {
-            let mut escrow = test::take_shared<CrossChainEscrow<SUI>>(&scenario);
-            let mut registry = test::take_shared<UsedSecretsRegistry>(&scenario);
-            
-            let received_coin = escrow::fill_escrow_partial(
-                &mut escrow,
-                &mut registry,
-                PARTIAL_AMOUNT_1,
-                secret,
-                &clock,
-                ctx(&mut scenario)
-            );
-            
-            coin::burn_for_testing(received_coin);
-            test::return_shared(escrow);
-            test::return_shared(registry);
-        };
-        
-        // Advance time past expiry
-        clock::increment_for_testing(&mut clock, ONE_HOUR_MS + 1000);
-        
-        // Cancel and get remaining amount
-        next_tx(&mut scenario, MAKER);
-        {
-            let mut escrow = test::take_shared<CrossChainEscrow<SUI>>(&scenario);
-            
-            let refunded_coin = escrow::cancel_escrow(
-                &mut escrow,
-                &clock,
-                ctx(&mut scenario)
-            );
-            
-            // Should only get the remaining amount (not the filled amount)
-            assert_eq(coin::value(&refunded_coin), TOTAL_AMOUNT - PARTIAL_AMOUNT_1);
-            
-            coin::burn_for_testing(refunded_coin);
-            test::return_shared(escrow);
-        };
-        
-        clock::destroy_for_testing(clock);
-        test::end(scenario);
+        let (mut scenario, mut clock) = setup();
+        clock.increment_for_testing(WITHDRAWAL);
+        fill(&mut scenario, &clock, MAKER, 300);
+
+        // Past the public cancellation window anyone may cancel; refund goes to MAKER.
+        clock.increment_for_testing(PUBLIC_CANCELLATION);
+        scenario.next_tx(RESOLVER1);
+        let mut lock = scenario.take_shared<LockObject<SUI>>();
+        escrow::cancel(&mut lock, &clock, scenario.ctx());
+        test::return_shared(lock);
+
+        // RESOLVER1 gets the safety deposit for doing the cancel.
+        assert!(received(&mut scenario, RESOLVER1) == DEPOSIT);
+
+        // MAKER holds two coins: the 300 fill and the 700 refund.
+        scenario.next_tx(MAKER);
+        let a = scenario.take_from_address<Coin<SUI>>(MAKER);
+        let b = scenario.take_from_address<Coin<SUI>>(MAKER);
+        assert!(a.value() + b.value() == TOTAL_AMOUNT);
+        assert!(a.value() == 700 || b.value() == 700);
+        test::return_to_address(MAKER, a);
+        test::return_to_address(MAKER, b);
+
+        clock.destroy_for_testing();
+        scenario.end();
     }
 
     #[test]
     fun test_multiple_resolvers_competition() {
-        let mut scenario = test::begin(MAKER);
-        let mut clock = clock::create_for_testing(ctx(&mut scenario));
-        
-        escrow::init_for_testing(ctx(&mut scenario));
-        next_tx(&mut scenario, MAKER);
-        
-        let secret = b"test_secret";
-        let hash_lock = hash::keccak256(&secret);
-        let time_lock = clock::timestamp_ms(&clock) + ONE_HOUR_MS;
-        let coin = coin::mint_for_testing<SUI>(TOTAL_AMOUNT, ctx(&mut scenario));
-        let ethereum_order_hash = string::utf8(b"0x1234567890abcdef");
-        
-        let escrow_id = escrow::create_and_share_escrow<SUI>(
-            coin,
-            @0x0, // Open to competition
-            hash_lock,
-            time_lock,
-            ethereum_order_hash,
-            &clock,
-            ctx(&mut scenario)
-        );
-        
-        // Resolver1 fills first
-        next_tx(&mut scenario, RESOLVER1);
-        {
-            let mut escrow = test::take_shared<CrossChainEscrow<SUI>>(&scenario);
-            let mut registry = test::take_shared<UsedSecretsRegistry>(&scenario);
-            
-            let received_coin = escrow::fill_escrow_partial(
-                &mut escrow,
-                &mut registry,
-                200, // 20%
-                secret,
-                &clock,
-                ctx(&mut scenario)
-            );
-            
-            assert_eq(coin::value(&received_coin), 200);
-            coin::burn_for_testing(received_coin);
-            test::return_shared(escrow);
-            test::return_shared(registry);
-        };
-        
-        // Resolver2 fills next
-        next_tx(&mut scenario, RESOLVER2);
-        {
-            let mut escrow = test::take_shared<CrossChainEscrow<SUI>>(&scenario);
-            let mut registry = test::take_shared<UsedSecretsRegistry>(&scenario);
-            
-            let received_coin = escrow::fill_escrow_partial(
-                &mut escrow,
-                &mut registry,
-                300, // 30%
-                secret,
-                &clock,
-                ctx(&mut scenario)
-            );
-            
-            assert_eq(coin::value(&received_coin), 300);
-            coin::burn_for_testing(received_coin);
-            test::return_shared(escrow);
-            test::return_shared(registry);
-        };
-        
-        // Resolver3 completes the escrow
-        next_tx(&mut scenario, RESOLVER3);
-        {
-            let mut escrow = test::take_shared<CrossChainEscrow<SUI>>(&scenario);
-            let mut registry = test::take_shared<UsedSecretsRegistry>(&scenario);
-            
-            let remaining = escrow::get_remaining_amount(&escrow);
-            assert_eq(remaining, 500); // 50% left
-            
-            let received_coin = escrow::fill_escrow_partial(
-                &mut escrow,
-                &mut registry,
-                remaining,
-                secret,
-                &clock,
-                ctx(&mut scenario)
-            );
-            
-            assert_eq(coin::value(&received_coin), 500);
-            assert_eq(escrow::get_remaining_amount(&escrow), 0);
-            
-            let (_, _, _, remaining_amount, _, _, is_filled, _, _) = escrow::get_escrow_info(&escrow);
-            assert_eq(remaining_amount, 0);
-            assert_eq(is_filled, true);
-            
-            coin::burn_for_testing(received_coin);
-            test::return_shared(escrow);
-            test::return_shared(registry);
-        };
-        
-        clock::destroy_for_testing(clock);
-        test::end(scenario);
+        let (mut scenario, mut clock) = setup();
+        // In the public window any resolver can fill.
+        clock.increment_for_testing(PUBLIC_WITHDRAWAL);
+
+        fill(&mut scenario, &clock, RESOLVER1, 200);
+        fill(&mut scenario, &clock, RESOLVER2, 300);
+        fill(&mut scenario, &clock, RESOLVER3, 500);
+
+        assert!(received(&mut scenario, RESOLVER1) == 200);
+        assert!(received(&mut scenario, RESOLVER2) == 300);
+        assert!(received(&mut scenario, RESOLVER3) == 500);
+        let (left, done) = remaining(&mut scenario);
+        assert!(left == 0);
+        assert!(done);
+
+        clock.destroy_for_testing();
+        scenario.end();
+    }
+
+    #[test, expected_failure(abort_code = escrow::EWithdrawNotAllowed)]
+    fun test_non_initiator_blocked_before_public_window() {
+        let (mut scenario, mut clock) = setup();
+        clock.increment_for_testing(WITHDRAWAL);
+
+        fill(&mut scenario, &clock, RESOLVER1, 100);
+
+        clock.destroy_for_testing();
+        scenario.end();
     }
 }

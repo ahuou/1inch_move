@@ -370,6 +370,10 @@ module oneinch_move::partial_fills {
         false
     }
 
+    public fun remainingAmount<T>(lock: &LockObject<T>): u64 { lock.remaining_amount }
+
+    public fun isFilled<T>(lock: &LockObject<T>): bool { lock.is_filled }
+
     public fun getUsedHashesCount(registry: &UsedSecretsRegistry): u64 {
         std::vector::length(&registry.used_hashes)
     }
